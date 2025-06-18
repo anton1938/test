@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
   Button,
   Checkbox,
   Container,
@@ -34,9 +33,6 @@ import {
   Upload as UploadIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Print as PrintIcon,
-  Check as CheckIcon,
-  Close as CloseIcon
 } from '@mui/icons-material';
 import { openDB } from 'idb';
 import axios from 'axios';
@@ -90,7 +86,7 @@ const App: React.FC = () => {
   const [newCurrency, setNewCurrency] = useState<'USD' | 'BYN'>('BYN');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('1');
-  const [showReceipt, setShowReceipt] = useState(true);
+  const [showReceipt] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -355,7 +351,7 @@ const App: React.FC = () => {
           </Stack>
         </Stack>
 
-        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+        <Tabs value={activeTab} onChange={(_e:any, newValue) => setActiveTab(newValue)}>
           <Tab label="Постоянные" value="1" />
           <Tab label="Обычные" value="2" />
         </Tabs>

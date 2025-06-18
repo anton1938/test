@@ -1,14 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Row, Col, InputNumber, Button, List, Modal, Space, Upload, message, Checkbox, Select, Popconfirm, Tabs, Divider } from 'antd';
-import { UploadOutlined, EditOutlined, DeleteOutlined, PrinterOutlined } from '@ant-design/icons';
-import Typography from 'antd/es/typography';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Container,
+  Divider,
+  FormControl,
+  InputAdornment,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  MenuItem,
+  Paper,
+  Select,
+  type SelectChangeEvent,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton
+} from '@mui/material';
+import {
+  AttachMoney as AttachMoneyIcon,
+  CurrencyRuble as CurrencyRubleIcon,
+  Upload as UploadIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Print as PrintIcon,
+  Check as CheckIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
 import { openDB } from 'idb';
 import axios from 'axios';
-
-const { Header, Content, Footer } = Layout;
-const { Title, Text } = Typography;
-const { Option } = Select;
-const { TabPane } = Tabs;
 
 const USD_RATE_API = 'https://open.er-api.com/v6/latest/USD';
 const DB_NAME = 'expenses-db';
@@ -97,7 +128,7 @@ const App: React.FC = () => {
   const left = totalBYN - usedBYN;
 
   const addExpense = async (constant: boolean) => {
-    if (!newName.trim() || newAmount <= 0) return message.error('Заполните поля');
+    if (!newName.trim() || newAmount <= 0) return alert('Заполните поля');
     const db = await getDb();
     const amountInUSD = convertToUSD(newAmount, newCurrency);
     const newExp: Expense = {
@@ -117,7 +148,7 @@ const App: React.FC = () => {
   };
 
   const editExpense = async () => {
-    if (!newName.trim() || newAmount <= 0 || !editingId) return message.error('Заполните поля');
+    if (!newName.trim() || newAmount <= 0 || !editingId) return alert('Заполните поля');
     const db = await getDb();
     const amountInUSD = convertToUSD(newAmount, newCurrency);
     const expenseToEdit = expenses.find(e => e.id === editingId);
@@ -139,10 +170,10 @@ const App: React.FC = () => {
   };
 
   const deleteExpense = async (id: number) => {
+    if (!window.confirm('Удалить эту запись?')) return;
     const db = await getDb();
     await db.delete(STORE_NAME, id);
     setExpenses(expenses.filter(e => e.id !== id));
-    message.success('Расход удален');
   };
 
   const handleEditClick = (expense: Expense) => {
@@ -165,7 +196,10 @@ const App: React.FC = () => {
     setExpenses(expenses.map(e => e.id === expense.id ? updatedExpense : e));
   };
 
-  const handleFileUpload = (file: File) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     const reader = new FileReader();
     reader.onload = () => {
       const html = reader.result as string;
@@ -183,45 +217,48 @@ const App: React.FC = () => {
       }
       setAdvance(advanceValue);
       setSalary(salaryValue);
-      message.success('HTML-файл обработан');
     };
     reader.readAsText(file);
-    return false;
   };
 
   const renderExpenseList = (expensesList: Expense[]) => (
-    <List
-      bordered
-      style={{ marginTop: 10 }}
-      dataSource={expensesList}
-      renderItem={e => (
-        <List.Item
-          actions={[
-            <Checkbox
-              checked={e.checked}
-              onChange={ev => toggleChecked(e, ev.target.checked)}
-            />,
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => handleEditClick(e)}
-            />,
-            <Popconfirm
-              title="Удалить эту запись?"
-              onConfirm={() => deleteExpense(e.id)}
-              okText="Да"
-              cancelText="Нет"
-            >
-              <Button type="text" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          ]}
+    <List dense>
+      {expensesList.map(expense => (
+        <ListItem
+          key={expense.id}
+          secondaryAction={
+            <Stack direction="row" spacing={1}>
+              <IconButton edge="end" onClick={() => handleEditClick(expense)}>
+                <EditIcon />
+              </IconButton>
+              <IconButton edge="end" onClick={() => deleteExpense(expense.id)}>
+                <DeleteIcon />
+              </IconButton>
+            </Stack>
+          }
+          disablePadding
         >
-          <span style={{ textDecoration: e.checked ? 'none' : 'line-through', opacity: e.checked ? 1 : 0.6 }}>
-            {e.name}: {e.amountUSD.toFixed(2)} USD ({(e.amountUSD * rate).toFixed(2)} BYN)
-          </span>
-        </List.Item>
-      )}
-    />
+          <ListItemButton onClick={() => toggleChecked(expense, !expense.checked)}>
+            <ListItemIcon>
+              <Checkbox
+                edge="start"
+                checked={expense.checked}
+                tabIndex={-1}
+                disableRipple
+              />
+            </ListItemIcon>
+            <ListItemText
+              primary={expense.name}
+              secondary={`${expense.amountUSD.toFixed(2)} USD (${(expense.amountUSD * rate).toFixed(2)} BYN)`}
+              sx={{
+                textDecoration: expense.checked ? 'none' : 'line-through',
+                opacity: expense.checked ? 1 : 0.6
+              }}
+            />
+          </ListItemButton>
+        </ListItem>
+      ))}
+    </List>
   );
 
   const renderReceipt = () => {
@@ -230,131 +267,173 @@ const App: React.FC = () => {
     const totalExpensesBYN = totalExpensesUSD * rate;
 
     return (
-      <div style={{ background: '#fff', padding: 20, marginTop: 20, borderRadius: 4 }}>
-        <Title level={4} style={{ textAlign: 'center' }}>Итоговый чек</Title>
-        <Divider />
+      <Paper elevation={3} sx={{ p: 2, mt: 3 }}>
+        <Typography variant="h6" align="center">Итоговый чек</Typography>
+        <Divider sx={{ my: 2 }} />
         
-        <Text strong style={{ display: 'block', marginBottom: 10 }}>
+        <Typography fontWeight="bold" gutterBottom>
           Общий доход: {totalBYN.toFixed(2)} BYN ({totalUSD} USD)
-        </Text>
+        </Typography>
         
-        <Divider orientation="left">Расходы</Divider>
+        <Divider textAlign="left">Расходы</Divider>
         {checkedExpenses.map(expense => (
-          <div key={expense.id} style={{ marginBottom: 8 }}>
+          <Typography key={expense.id} gutterBottom>
             - {expense.name}: {expense.amountUSD.toFixed(2)} USD ({(expense.amountUSD * rate).toFixed(2)} BYN)
-          </div>
+          </Typography>
         ))}
         
-        <Divider />
-        <Text strong style={{ display: 'block' }}>
+        <Divider sx={{ my: 2 }} />
+        <Typography fontWeight="bold">
           Итого расходов: {totalExpensesUSD.toFixed(2)} USD ({totalExpensesBYN.toFixed(2)} BYN)
-        </Text>
+        </Typography>
         
-        <Text strong style={{ display: 'block', marginTop: 10, fontSize: 16 }}>
+        <Typography fontWeight="bold" sx={{ mt: 2, fontSize: 16 }}>
           Остаток: {(left / rate).toFixed(2)} USD ({left.toFixed(2)} BYN)
-        </Text>
-
-      </div>
+        </Typography>
+      </Paper>
     );
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header><Title level={2} style={{ color: '#fff' }}>Планировщик</Title></Header>
-      <Content style={{ padding: 20, maxWidth: 600, margin: 'auto' }}>
-        <Upload beforeUpload={handleFileUpload} showUploadList={false} accept=".html">
-          <Button icon={<UploadOutlined />}>Загрузить расчетный HTML</Button>
-        </Upload>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Планировщик расходов
+      </Typography>
 
-        <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
-          <Col span={24}>
-            <Title level={4}>Доходы</Title>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text>ЗП (BYN):</Text>
-              <InputNumber 
-                value={salary} 
-                onChange={v => setSalary(v || 0)} 
-                style={{ width: '100%' }} 
-                placeholder="2595"
-              />
-              <Text>Аванс (BYN):</Text>
-              <InputNumber 
-                value={advance} 
-                onChange={v => setAdvance(v || 0)} 
-                style={{ width: '100%' }} 
-              />
-              <Text strong>Итого: {totalBYN.toFixed(2)} BYN ({totalUSD} USD)</Text>
-              <Text type="secondary">Курс: 1 USD = {rate.toFixed(4)} BYN</Text>
-            </Space>
-          </Col>
-
-          <Col span={24} style={{ marginTop: 20 }}>
-            <Title level={4}>Затраты</Title>
-            <Space>
-              <Button onClick={() => setModalType('constant')}>Добавить постоянные</Button>
-              <Button onClick={() => setModalType('regular')}>Добавить обычные</Button>
-           
-            </Space>
-
-            <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ marginTop: 10 }}>
-              <TabPane tab="Постоянные" key="1">
-                {renderExpenseList(constantExpenses)}
-                <Text strong style={{ display: 'block', marginTop: 10 }}>
-                  Итого постоянные (учитываются): {constantExpenses.filter(e => e.checked).reduce((sum, e) => sum + e.amountUSD, 0).toFixed(2)} USD (
-                  {constantExpenses.filter(e => e.checked).reduce((sum, e) => sum + e.amountUSD * rate, 0).toFixed(2)} BYN)
-                </Text>
-              </TabPane>
-              <TabPane tab="Обычные" key="2">
-                {renderExpenseList(regularExpenses)}
-                <Text strong style={{ display: 'block', marginTop: 10 }}>
-                  Итого обычные (учитываются): {regularExpenses.filter(e => e.checked).reduce((sum, e) => sum + e.amountUSD, 0).toFixed(2)} USD (
-                  {regularExpenses.filter(e => e.checked).reduce((sum, e) => sum + e.amountUSD * rate, 0).toFixed(2)} BYN)
-                </Text>
-              </TabPane>
-            </Tabs>
-          </Col>
-        </Row>
-
-        {showReceipt && renderReceipt()}
-      </Content>
-      <Modal
-        open={!!modalType}
-        title={
-          modalType === 'constant' ? 'Добавить постоянные расходы' :
-          modalType === 'regular' ? 'Добавить обычные расходы' : 'Редактировать'
-        }
-        onOk={() => modalType === 'edit' ? editExpense() : addExpense(modalType === 'constant')}
-        onCancel={() => {
-          setModalType(null);
-          setNewName('');
-          setNewAmount(0);
-          setNewCurrency('BYN');
-          setEditingId(null);
-        }}
-        okText={modalType === 'edit' ? 'Сохранить' : 'Добавить'}
+      <Button
+        component="label"
+        variant="contained"
+        startIcon={<UploadIcon />}
+        sx={{ mb: 3 }}
       >
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Text>Название:</Text>
-          <input
-            type="text"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            style={{ width: '100%', padding: 8 }}
+        Загрузить расчетный HTML
+        <input type="file" hidden accept=".html" onChange={handleFileUpload} />
+      </Button>
+
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h5" gutterBottom>Доходы</Typography>
+        <Stack spacing={2}>
+          <TextField
+            label="ЗП (BYN)"
+            type="number"
+            value={salary}
+            onChange={e => setSalary(parseFloat(e.target.value) || 0)}
+            fullWidth
+            InputProps={{
+              endAdornment: <InputAdornment position="end">BYN</InputAdornment>,
+            }}
           />
-          <Text>Сумма:</Text>
-          <InputNumber
-            min={0}
-            value={newAmount}
-            onChange={val => setNewAmount(val || 0)}
-            style={{ width: '100%' }}
+          <TextField
+            label="Аванс (BYN)"
+            type="number"
+            value={advance}
+            onChange={e => setAdvance(parseFloat(e.target.value) || 0)}
+            fullWidth
+            InputProps={{
+              endAdornment: <InputAdornment position="end">BYN</InputAdornment>,
+            }}
           />
-          <Select value={newCurrency} onChange={val => setNewCurrency(val)}>
-            <Option value="USD">USD</Option>
-            <Option value="BYN">BYN</Option>
-          </Select>
-        </Space>
-      </Modal>
-    </Layout>
+          <Typography fontWeight="bold">
+            Итого: {totalBYN.toFixed(2)} BYN ({totalUSD} USD)
+          </Typography>
+          <Typography color="text.secondary">
+            Курс: 1 USD = {rate.toFixed(4)} BYN
+          </Typography>
+        </Stack>
+      </Paper>
+
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h5">Затраты</Typography>
+          <Stack direction="row" spacing={1}>
+            <Button variant="contained" onClick={() => setModalType('constant')}>
+              Добавить постоянные
+            </Button>
+            <Button variant="contained" onClick={() => setModalType('regular')}>
+              Добавить обычные
+            </Button>
+          </Stack>
+        </Stack>
+
+        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+          <Tab label="Постоянные" value="1" />
+          <Tab label="Обычные" value="2" />
+        </Tabs>
+
+        {activeTab === '1' && (
+          <>
+            {renderExpenseList(constantExpenses)}
+            <Typography fontWeight="bold" sx={{ mt: 2 }}>
+              Итого постоянные (учитываются): {constantExpenses.filter(e => e.checked).reduce((sum, e) => sum + e.amountUSD, 0).toFixed(2)} USD (
+              {constantExpenses.filter(e => e.checked).reduce((sum, e) => sum + e.amountUSD * rate, 0).toFixed(2)} BYN)
+            </Typography>
+          </>
+        )}
+
+        {activeTab === '2' && (
+          <>
+            {renderExpenseList(regularExpenses)}
+            <Typography fontWeight="bold" sx={{ mt: 2 }}>
+              Итого обычные (учитываются): {regularExpenses.filter(e => e.checked).reduce((sum, e) => sum + e.amountUSD, 0).toFixed(2)} USD (
+              {regularExpenses.filter(e => e.checked).reduce((sum, e) => sum + e.amountUSD * rate, 0).toFixed(2)} BYN)
+            </Typography>
+          </>
+        )}
+      </Paper>
+
+      {showReceipt && renderReceipt()}
+
+      <Dialog open={!!modalType} onClose={() => setModalType(null)}>
+        <DialogTitle>
+          {modalType === 'constant' ? 'Добавить постоянные расходы' :
+           modalType === 'regular' ? 'Добавить обычные расходы' : 'Редактировать'}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Название"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Сумма"
+              type="number"
+              value={newAmount}
+              onChange={e => setNewAmount(parseFloat(e.target.value) || 0)}
+              fullWidth
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {newCurrency === 'USD' ? <AttachMoneyIcon /> : <CurrencyRubleIcon />}
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Валюта</InputLabel>
+              <Select
+                value={newCurrency}
+                label="Валюта"
+                onChange={(e: SelectChangeEvent<'USD' | 'BYN'>) => setNewCurrency(e.target.value as 'USD' | 'BYN')}
+              >
+                <MenuItem value="USD">USD</MenuItem>
+                <MenuItem value="BYN">BYN</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModalType(null)}>Отмена</Button>
+          <Button
+            onClick={() => modalType === 'edit' ? editExpense() : addExpense(modalType === 'constant')}
+            variant="contained"
+          >
+            {modalType === 'edit' ? 'Сохранить' : 'Добавить'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Container>
   );
 };
 
